@@ -14,8 +14,10 @@ app.post('/user-info', async (c) => {
   try {
     console.log('=== API ENDPOINT HIT ===')
 
-    const body = await c.req.json().catch(() => ({}))
-    console.log('Request body:', body)
+    const body = await c.req.json();
+
+
+    console.log(body)
 
     // Get client IP (considering proxy)
     const clientIP =

@@ -61,8 +61,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           fetchUserInfo({
-            lat: pos.coords.latitude,
-            long: pos.coords.longitude,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
           })
         },
         (geoErr) => {
