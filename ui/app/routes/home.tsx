@@ -101,7 +101,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <pre className="mt-8">{JSON.stringify(data, null, 2)}</pre>
 
 
-      {data?.location?.latitude && data?.location?.longitude && (
+      {typeof window !== "undefined" && data?.location?.latitude && data?.location?.longitude && (
         <div className="mt-10 w-full" style={{ height: "500px" }}>
           <MapContainer
             center={[data.location.latitude, data.location.longitude]}
@@ -121,6 +121,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </MapContainer>
         </div>
       )}
+
     </div>
   );
 }
