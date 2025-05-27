@@ -9,16 +9,52 @@ interface UserInfoInput {
     acceptLanguage?: string;
 }
 
-interface LocationInfo {
+interface DetailedLocationInfo {
+    // GPS Coordinates
     latitude?: number;
     longitude?: number;
+
+    // Administrative divisions
     country?: string;
     countryCode?: string;
-    region?: string;
-    city?: string;
-    postalCode?: string;
-    address?: string;        // full display_name from Nominatim
     continent?: string;
+    state?: string;
+    region?: string;
+    district?: string;
+    county?: string;
+
+    // City/Town/Village
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+
+    // Detailed address components
+    suburb?: string;
+    neighbourhood?: string;
+    quarter?: string;
+    cityDistrict?: string;
+
+    // Street level
+    road?: string;
+    street?: string;
+    houseNumber?: string;
+    houseName?: string;
+
+    // Postal
+    postalCode?: string;
+    postcode?: string;
+
+    // Points of interest
+    amenity?: string;
+    building?: string;
+    shop?: string;
+
+    // Full formatted address
+    address?: string;
+    displayName?: string;
+
+    // Timezone and currency
     timezone?: {
         id?: string;
         abbr?: string;
@@ -53,7 +89,7 @@ interface UserInfo {
     ip: string;
     userAgent: string;
     acceptLanguage?: string;
-    location: LocationInfo;
+    location: DetailedLocationInfo;
     isp: ISPInfo;
     device: DeviceInfo;
     timestamp: string;
@@ -86,7 +122,6 @@ async function getIPInfo(ip: string): Promise<any> {
                 throw new Error(fallbackData.message);
             }
 
-            // Map ip-api.com response to ipwhois.app format
             return {
                 country: fallbackData.country,
                 country_code: fallbackData.countryCode,
@@ -109,14 +144,16 @@ async function getIPInfo(ip: string): Promise<any> {
     }
 }
 
-// Enhanced reverse geocoding using OpenStreetMap Nominatim
+// Enhanced reverse geocoding with detailed address parsing
 async function reverseGeocode(lat: number, lng: number): Promise<any> {
     try {
+        // Request with maximum detail level
         const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&extratags=1&namedetails=1`,
             {
                 headers: {
-                    'User-Agent': 'ExpenseAPI/1.0 (ping@nischal.pro)'
+                    'User-Agent': 'ExpenseAPI/1.0 (ping@nischal.pro)',
+                    'Accept-Language': 'en'
                 }
             }
         );
@@ -129,9 +166,56 @@ async function reverseGeocode(lat: number, lng: number): Promise<any> {
     }
 }
 
+// Parse detailed address components from Nominatim response
+function parseDetailedAddress(geoData: any): Partial<DetailedLocationInfo> {
+    if (!geoData || !geoData.address) return {};
+
+    const addr = geoData.address;
+
+    return {
+        // Administrative divisions
+        country: addr.country,
+        countryCode: addr.country_code?.toUpperCase(),
+        state: addr.state || addr.province,
+        region: addr.region || addr.state_district,
+        district: addr.district || addr.state_district,
+        county: addr.county,
+
+        // City/Town/Village hierarchy
+        city: addr.city || addr.town || addr.village || addr.municipality,
+        town: addr.town,
+        village: addr.village,
+        municipality: addr.municipality,
+
+        // Detailed neighborhood info
+        suburb: addr.suburb,
+        neighbourhood: addr.neighbourhood || addr.neighborhood,
+        quarter: addr.quarter,
+        cityDistrict: addr.city_district,
+
+        // Street level details
+        road: addr.road || addr.street,
+        street: addr.street || addr.road,
+        houseNumber: addr.house_number,
+        houseName: addr.house_name,
+
+        // Postal codes
+        postalCode: addr.postcode || addr.postal_code,
+        postcode: addr.postcode,
+
+        // Points of interest
+        amenity: addr.amenity,
+        building: addr.building,
+        shop: addr.shop,
+
+        // Full address
+        address: geoData.display_name,
+        displayName: geoData.display_name
+    };
+}
+
 // Enhanced User Agent parsing
 function parseUserAgent(userAgent: string): DeviceInfo {
-    // Simple parsing - you can use a library like 'ua-parser-js' for better results
     const browser = userAgent.includes('Chrome') ? 'Chrome' :
         userAgent.includes('Firefox') ? 'Firefox' :
             userAgent.includes('Safari') ? 'Safari' :
@@ -147,7 +231,7 @@ function parseUserAgent(userAgent: string): DeviceInfo {
     const deviceType = userAgent.includes('Mobile') ? 'Mobile' :
         userAgent.includes('Tablet') ? 'Tablet' : 'Desktop';
 
-    // Extract versions (basic)
+    // Extract versions
     let browserVersion = 'Unknown';
     let osVersion = 'Unknown';
 
@@ -201,7 +285,7 @@ function parseUserAgent(userAgent: string): DeviceInfo {
         os,
         osVersion,
         deviceType,
-        device: deviceType // Keep backward compatibility
+        device: deviceType
     };
 }
 
@@ -215,7 +299,7 @@ export async function getUserInfo(input: UserInfoInput): Promise<UserInfo> {
     const ipInfo = await getIPInfo(ip);
 
     // Build base location from IP info
-    const locationInfo: LocationInfo = {
+    const locationInfo: DetailedLocationInfo = {
         country: ipInfo?.country,
         countryCode: ipInfo?.country_code,
         region: ipInfo?.region,
@@ -237,20 +321,19 @@ export async function getUserInfo(input: UserInfoInput): Promise<UserInfo> {
         }
     };
 
-    // If browser geolocation is available, use reverse geocoding for precise address
+    // If browser geolocation is available, get detailed address
     if (typeof latitude === 'number' && typeof longitude === 'number') {
         const geoData = await reverseGeocode(latitude, longitude);
-        if (geoData && geoData.address) {
+        if (geoData) {
+            // Parse detailed address components
+            const detailedAddress = parseDetailedAddress(geoData);
+
+            // Override with precise GPS coordinates
             locationInfo.latitude = latitude;
             locationInfo.longitude = longitude;
-            locationInfo.address = geoData.display_name;
 
-            // Override with more precise data from Nominatim
-            locationInfo.country = geoData.address.country || locationInfo.country;
-            locationInfo.countryCode = geoData.address.country_code || locationInfo.countryCode;
-            locationInfo.region = geoData.address.state || geoData.address.region || locationInfo.region;
-            locationInfo.city = geoData.address.city || geoData.address.town || geoData.address.village || locationInfo.city;
-            locationInfo.postalCode = geoData.address.postcode || locationInfo.postalCode;
+            // Merge detailed address info
+            Object.assign(locationInfo, detailedAddress);
         }
     }
 
@@ -260,7 +343,7 @@ export async function getUserInfo(input: UserInfoInput): Promise<UserInfo> {
         org: ipInfo?.org,
         isp: ipInfo?.isp,
         domain: ipInfo?.domain,
-        provider: ipInfo?.isp // Keep backward compatibility
+        provider: ipInfo?.isp
     };
 
     return {
