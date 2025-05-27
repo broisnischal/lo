@@ -1,4 +1,3 @@
-// src/services/userInfo.ts
 
 interface UserInfoInput {
     ip: string;
@@ -18,30 +17,36 @@ interface DetailedLocationInfo {
     country?: string;
     countryCode?: string;
     continent?: string;
+    continentCode?: string;
+
+    // State/Province/Region
     state?: string;
     region?: string;
+    province?: string;
+
+    // District/County
     district?: string;
     county?: string;
 
-    // City/Town/Village
+    // City/Town/Village hierarchy
     city?: string;
     town?: string;
     village?: string;
     municipality?: string;
 
-    // Detailed address components
+    // Detailed neighborhood info
     suburb?: string;
     neighbourhood?: string;
     quarter?: string;
     cityDistrict?: string;
 
-    // Street level
+    // Street level details
     road?: string;
     street?: string;
     houseNumber?: string;
     houseName?: string;
 
-    // Postal
+    // Postal codes
     postalCode?: string;
     postcode?: string;
 
@@ -50,26 +55,40 @@ interface DetailedLocationInfo {
     building?: string;
     shop?: string;
 
-    // Full formatted address
+    // Full formatted addresses
     address?: string;
     displayName?: string;
 
-    // Timezone and currency
+    // Country details
+    countryFlag?: string;
+    countryCapital?: string;
+    countryPhone?: string;
+    countryNeighbours?: string;
+
+    // Timezone information
     timezone?: {
         id?: string;
+        name?: string;
         abbr?: string;
         offset?: number;
+        gmtOffset?: number;
+        dstOffset?: number;
+        gmt?: string;
         isDST?: boolean;
     };
+
+    // Currency information
     currency?: {
         code?: string;
         name?: string;
         symbol?: string;
+        rates?: number;
+        plural?: string;
     };
 }
 
 interface ISPInfo {
-    asn?: number;
+    asn?: string;
     org?: string;
     isp?: string;
     domain?: string;
@@ -130,9 +149,7 @@ async function getIPInfo(ip: string): Promise<any> {
                 postal: fallbackData.zip,
                 latitude: fallbackData.lat,
                 longitude: fallbackData.lon,
-                timezone: {
-                    id: fallbackData.timezone
-                },
+                timezone: fallbackData.timezone,
                 isp: fallbackData.isp,
                 org: fallbackData.org,
                 asn: fallbackData.as
@@ -146,7 +163,7 @@ async function getIPInfo(ip: string): Promise<any> {
 
 // Multiple geocoding attempts with different zoom levels
 async function reverseGeocodeDetailed(lat: number, lng: number): Promise<any> {
-    const zoomLevels = [18, 16, 14, 12]; // Try different zoom levels for more detail
+    const zoomLevels = [18, 16, 14, 12];
 
     for (const zoom of zoomLevels) {
         try {
@@ -185,85 +202,49 @@ async function reverseGeocodeDetailed(lat: number, lng: number): Promise<any> {
     return null;
 }
 
-// Alternative geocoding using different services
-async function getAlternativeGeocode(lat: number, lng: number): Promise<any> {
-    try {
-        // Try BigDataCloud (free tier)
-        const response = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
-        );
-
-        if (response.ok) {
-            const data = await response.json();
-            console.log('BigDataCloud response:', JSON.stringify(data, null, 2));
-
-            // Map BigDataCloud response to our format
-            return {
-                address: {
-                    country: data.countryName,
-                    country_code: data.countryCode,
-                    state: data.principalSubdivision,
-                    city: data.city || data.locality,
-                    postcode: data.postcode,
-                    road: data.street,
-                    house_number: data.streetNumber
-                },
-                display_name: `${data.streetNumber || ''} ${data.street || ''}, ${data.city || ''}, ${data.principalSubdivision || ''}, ${data.countryName || ''}`.replace(/,\s*,/g, ',').trim()
-            };
-        }
-    } catch (error) {
-        console.error('Alternative geocoding error:', error);
-    }
-
-    return null;
-}
-
-// Enhanced address parsing with more fallbacks
-function parseDetailedAddress(geoData: any, alternativeData: any = null): Partial<DetailedLocationInfo> {
+// Enhanced address parsing with comprehensive merging
+function parseDetailedAddress(geoData: any): Partial<DetailedLocationInfo> {
     console.log('Parsing address from:', JSON.stringify(geoData, null, 2));
 
-    if (!geoData) {
-        if (alternativeData) {
-            console.log('Using alternative data:', JSON.stringify(alternativeData, null, 2));
-            geoData = alternativeData;
-        } else {
-            return {};
-        }
-    }
+    if (!geoData || !geoData.address) return {};
 
-    const addr = geoData.address || {};
+    const addr = geoData.address;
 
-    // Extract all possible address components
     const result = {
         // Administrative divisions
-        country: addr.country || addr.countryName,
-        countryCode: (addr.country_code || addr.countryCode)?.toUpperCase(),
-        state: addr.state || addr.province || addr.principalSubdivision || addr.state_district,
-        region: addr.region || addr.state_district || addr.administrative_area_level_1,
-        district: addr.district || addr.state_district || addr.administrative_area_level_2,
-        county: addr.county || addr.administrative_area_level_3,
+        country: addr.country,
+        countryCode: addr.country_code?.toUpperCase(),
 
-        // City/Town/Village hierarchy
-        city: addr.city || addr.town || addr.village || addr.municipality || addr.locality,
+        // State/Province/Region - keep all variations
+        state: addr.state,
+        region: addr.region,
+        province: addr.province,
+
+        // District/County
+        district: addr.district || addr.state_district,
+        county: addr.county,
+
+        // City/Town/Village hierarchy - keep all
+        city: addr.city,
         town: addr.town,
         village: addr.village,
         municipality: addr.municipality,
 
         // Detailed neighborhood info
-        suburb: addr.suburb || addr.sublocality || addr.sublocality_level_1,
-        neighbourhood: addr.neighbourhood || addr.neighborhood || addr.sublocality_level_2,
+        suburb: addr.suburb,
+        neighbourhood: addr.neighbourhood || addr.neighborhood,
         quarter: addr.quarter,
-        cityDistrict: addr.city_district || addr.city_block,
+        cityDistrict: addr.city_district,
 
         // Street level details
-        road: addr.road || addr.street || addr.route,
-        street: addr.street || addr.road || addr.route,
-        houseNumber: addr.house_number || addr.streetNumber || addr.street_number,
+        road: addr.road,
+        street: addr.street,
+        houseNumber: addr.house_number,
         houseName: addr.house_name,
 
         // Postal codes
-        postalCode: addr.postcode || addr.postal_code || addr.zip,
-        postcode: addr.postcode || addr.postal_code,
+        postalCode: addr.postcode || addr.postal_code,
+        postcode: addr.postcode,
 
         // Points of interest
         amenity: addr.amenity,
@@ -271,8 +252,8 @@ function parseDetailedAddress(geoData: any, alternativeData: any = null): Partia
         shop: addr.shop,
 
         // Full address
-        address: geoData.display_name || geoData.formatted_address,
-        displayName: geoData.display_name || geoData.formatted_address
+        address: geoData.display_name,
+        displayName: geoData.display_name
     };
 
     console.log('Parsed address result:', JSON.stringify(result, null, 2));
@@ -347,6 +328,27 @@ function parseUserAgent(userAgent: string): DeviceInfo {
     };
 }
 
+// Helper function to safely merge objects without overwriting
+function safeMerge(target: any, source: any): any {
+    const result = { ...target };
+
+    for (const key in source) {
+        if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+            // If target doesn't have this key, or target's value is empty/null, use source
+            if (!result[key] || result[key] === '' || result[key] === null) {
+                result[key] = source[key];
+            }
+            // If both exist and are objects, merge recursively
+            else if (typeof result[key] === 'object' && typeof source[key] === 'object' && !Array.isArray(result[key])) {
+                result[key] = safeMerge(result[key], source[key]);
+            }
+            // Otherwise keep the existing value (don't overwrite)
+        }
+    }
+
+    return result;
+}
+
 export async function getUserInfo(input: UserInfoInput): Promise<UserInfo> {
     const { ip, userAgent, latitude, longitude, timestamp, acceptLanguage } = input;
 
@@ -360,57 +362,74 @@ export async function getUserInfo(input: UserInfoInput): Promise<UserInfo> {
     const ipInfo = await getIPInfo(ip);
     console.log('IP Info:', ipInfo);
 
-    // Build base location from IP info
+    // Build comprehensive location from IP info
     const locationInfo: DetailedLocationInfo = {
-        country: ipInfo?.country,
-        countryCode: ipInfo?.country_code,
-        region: ipInfo?.region,
-        city: ipInfo?.city,
+        // GPS from IP (will be overridden by browser GPS if available)
         latitude: ipInfo?.latitude,
         longitude: ipInfo?.longitude,
-        postalCode: ipInfo?.postal,
+
+        // Administrative divisions
+        country: ipInfo?.country,
+        countryCode: ipInfo?.country_code?.toUpperCase(),
         continent: ipInfo?.continent,
+        continentCode: ipInfo?.continent_code,
+
+        // State/Region
+        region: ipInfo?.region,
+        state: ipInfo?.region, // Some APIs use different field names
+
+        // City
+        city: ipInfo?.city,
+
+        // Postal
+        postalCode: ipInfo?.postal,
+
+        // Country details
+        countryFlag: ipInfo?.country_flag,
+        countryCapital: ipInfo?.country_capital,
+        countryPhone: ipInfo?.country_phone,
+        countryNeighbours: ipInfo?.country_neighbours,
+
+        // Timezone information
         timezone: {
-            id: ipInfo?.timezone?.id || ipInfo?.timezone,
-            abbr: ipInfo?.timezone?.abbr,
-            offset: ipInfo?.timezone?.offset,
-            isDST: ipInfo?.timezone?.is_dst
+            id: ipInfo?.timezone,
+            name: ipInfo?.timezone_name,
+            abbr: ipInfo?.timezone_name,
+            offset: ipInfo?.timezone_gmtOffset,
+            gmtOffset: ipInfo?.timezone_gmtOffset,
+            dstOffset: ipInfo?.timezone_dstOffset,
+            gmt: ipInfo?.timezone_gmt,
+            isDST: ipInfo?.timezone_dstOffset > 0
         },
+
+        // Currency information
         currency: {
-            code: ipInfo?.currency?.code,
-            name: ipInfo?.currency?.name,
-            symbol: ipInfo?.currency?.symbol
+            code: ipInfo?.currency_code,
+            name: ipInfo?.currency,
+            symbol: ipInfo?.currency_symbol,
+            rates: ipInfo?.currency_rates,
+            plural: ipInfo?.currency_plural
         }
     };
 
-    // If browser geolocation is available, get detailed address
+    // If browser geolocation is available, get detailed address and merge
     if (typeof latitude === 'number' && typeof longitude === 'number') {
         console.log('=== Starting detailed geocoding ===');
 
-        // Try primary geocoding service
         const geoData = await reverseGeocodeDetailed(latitude, longitude);
 
-        // Try alternative service if primary fails
-        const alternativeData = !geoData ? await getAlternativeGeocode(latitude, longitude) : null;
-
-        if (geoData || alternativeData) {
+        if (geoData) {
             console.log('=== Geocoding successful ===');
 
             // Parse detailed address components
-            const detailedAddress = parseDetailedAddress(geoData, alternativeData);
+            const detailedAddress = parseDetailedAddress(geoData);
 
-            // Override with precise GPS coordinates
+            // Override GPS coordinates with precise browser location
             locationInfo.latitude = latitude;
             locationInfo.longitude = longitude;
 
-            // Merge detailed address info, keeping existing values as fallback
-            Object.keys(detailedAddress).forEach(key => {
-                const typedKey = key as keyof DetailedLocationInfo;
-                const value = detailedAddress[typedKey];
-                if (value !== undefined && value !== null && value !== '') {
-                    (locationInfo[typedKey] as any) = value;
-                }
-            });
+            // Safely merge detailed address info without overwriting existing data
+            Object.assign(locationInfo, safeMerge(locationInfo, detailedAddress));
         } else {
             console.log('=== Geocoding failed, using IP-based location ===');
         }
