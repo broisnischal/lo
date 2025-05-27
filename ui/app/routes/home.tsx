@@ -2,6 +2,16 @@ import { useEffect } from "react";
 import { useState } from "react";
 import type { Route } from "./+types/home";
 
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
 export async function loader() {
   // const response = await fetch("http://localhost:3000/user-info", {
   //   method: "POST",
@@ -97,6 +107,27 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
       <pre className="mt-8">{JSON.stringify(data, null, 2)}</pre>
 
+
+      {data?.location?.latitude && data?.location?.longitude && (
+        <div className="mt-10 h-[500px] w-full rounded overflow-hidden">
+          <MapContainer
+            center={[data.location.latitude, data.location.longitude]}
+            zoom={13}
+            style={{ height: "100%", width: "100%" }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Marker position={[data.location.latitude, data.location.longitude]}>
+              <Popup>
+                You are here: <br />
+                {data.location.city}, {data.location.country}
+              </Popup>
+            </Marker>
+          </MapContainer>
+        </div>
+      )}
     </div>
   );
 }
