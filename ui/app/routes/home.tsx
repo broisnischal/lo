@@ -4,13 +4,6 @@ import type { Route } from "./+types/home";
 
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
 
 export async function loader() {
   // const response = await fetch("http://localhost:3000/user-info", {
@@ -109,7 +102,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
 
       {data?.location?.latitude && data?.location?.longitude && (
-        <div className="mt-10 h-[500px] w-full rounded overflow-hidden">
+        <div className="mt-10 w-full" style={{ height: "500px" }}>
           <MapContainer
             center={[data.location.latitude, data.location.longitude]}
             zoom={13}
@@ -121,7 +114,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             />
             <Marker position={[data.location.latitude, data.location.longitude]}>
               <Popup>
-                You are here: <br />
+                You are here:<br />
                 {data.location.city}, {data.location.country}
               </Popup>
             </Marker>
