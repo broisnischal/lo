@@ -1,11 +1,16 @@
 import { Hono } from 'hono'
 import { getUserInfo } from './services/user_info'
+import { cors } from 'hono/cors'
 
 const app = new Hono();
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
+
+app.use(cors({
+  origin: '*',
+}))
 
 app.get('/health', (c) => c.json({ status: 'ok', time: new Date() }))
 
