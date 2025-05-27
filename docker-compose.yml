@@ -1,0 +1,44 @@
+services:
+  backend:
+    build: .
+    container_name: app_backend
+    ports:
+      - "4000:4000"
+    volumes:
+      - .:/app
+      - backend_data:/app/userinfo.sqlite
+    networks:
+      - appnet
+
+  ui:
+    build: ./ui
+    container_name: app_ui
+    expose:
+      - "3000:3000"
+    networks:
+      - appnet
+
+  caddy:
+    image: caddy:2
+    container_name: app_caddy
+    depends_on:
+      - backend
+      - ui
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  backend_data:
+  caddy_data:
+  caddy_config:

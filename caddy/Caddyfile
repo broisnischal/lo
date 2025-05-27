@@ -1,0 +1,22 @@
+# Listen on :80 and :443, handle TLS automatically
+:80, :443 {
+	tls snehaa@gmail.com
+
+	encode gzip
+
+	# API → backend
+	handle_path /api/* {
+		reverse_proxy backend:4000
+	}
+
+	# Everything else → frontend
+	handle {
+		reverse_proxy ui:3000
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		X-XSS-Protection "1; mode=block"
+	}
+}

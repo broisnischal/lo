@@ -1,0 +1,22 @@
+snehaa.com {
+	reverse_proxy localhost:3000
+
+	header_up X-Real-IP {remote_host}
+	header_up X-Forwarded-For {remote_host}
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		X-XSS-Protection "1; mode=block"
+	}
+
+	# Rate limiting (optional)
+	rate_limit {
+		zone dynamic {
+			key {remote_host}
+			events 100
+			window 1m
+		}
+	}
+}
