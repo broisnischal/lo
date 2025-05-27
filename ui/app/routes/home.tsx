@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { useState } from "react";
 import type { Route } from "./+types/home";
-
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { ClientOnly } from "remix-utils/client-only";
+import { MapComponent } from "~/comps/map.client";
 
 export async function loader() {
   // const response = await fetch("http://localhost:3000/user-info", {
@@ -101,27 +100,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <pre className="mt-8">{JSON.stringify(data, null, 2)}</pre>
 
 
-      {typeof window !== "undefined" && data?.location?.latitude && data?.location?.longitude && (
-        <div className="mt-10 w-full" style={{ height: "500px" }}>
-          <MapContainer
-            center={[data.location.latitude, data.location.longitude]}
-            zoom={13}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <Marker position={[data.location.latitude, data.location.longitude]}>
-              <Popup>
-                You are here:<br />
-                {data.location.city}, {data.location.country}
-              </Popup>
-            </Marker>
-          </MapContainer>
-        </div>
-      )}
-
+      <ClientOnly fallback={<div>Loading map...</div>}>
+        {() => (
+          <MapComponent data={data} />
+        )}
+      </ClientOnly>
     </div>
   );
 }
